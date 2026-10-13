@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Symptom Assessment — SkinSense{% endblock %}
+{% block content %}
+
+<section class="page-header">
+    <h1>Symptom Assessment</h1>
+    <p class="page-subtitle">Chat with our AI assistant about your skin symptoms.</p>
+</section>
+
+<div class="chat-card">
+
+    <div id="imageNote" class="info-note" style="display:none;"></div>
+
+    <div id="chatWindow" class="chat-window"></div>
+
+    <div class="chat-input-area">
+        <input type="text" id="chatInput" placeholder="Type your message..." onkeypress="if(event.key==='Enter') sendMessage()">
+        <button class="btn btn-send" id="sendBtn" onclick="sendMessage()">Send</button>
+    </div>
+
+    <div class="chat-footer-actions">
+        <button class="btn btn-outline btn-small" onclick="findDermatologists()">📍 Find dermatologists near me</button>
+    </div>
+
+    <p class="disclaimer">This assistant is AI-powered and does not provide medical diagnosis. Consult a qualified healthcare professional for confirmation.</p>
+
+</div>
+
+<script>
+    const chatWindow = document.getElementById('chatWindow');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    function addBubble(text, sender) {
+        const bubble = document.createElement('div');
+        bubble.className = sender === 'bot' ? 'bubble bot-bubble' : 'bubble user-bubble';
+        bubble.innerText = text;
+        chatWindow.appendChild(bubble);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function addTypingIndicator() {
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble bot-bubble typing-indicator';
+        bubble.id = 'typingIndicator';
+        bubble.innerText = '...';
+        chatWindow.appendChild(bubble);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function removeTypingIndicator() {
+        const el = document.getElementById('typingIndicator');
+        if (el) el.remove();
+    }
+
+    async function startChat() {
+        // Did the user arrive from an image result?
+        let imageContext = null;
+        try {
+            const raw = sessionStorage.getItem('imageContext');
+            if (raw) {
+                imageContext = JSON.parse(raw);
+                sessionStorage.removeItem('imageContext');
+            }
+        } catch (e) {}
+
+        if (imageContext && imageContext.condition) {
+            const note = document.getElementById('imageNote');
+            note.innerText = `Continuing from your image result: ${imageContext.condition} (${imageContext.confidence}% model confidence)`;
+            note.style.display = 'block';
+        }
+
+        chatInput.disabled = true;
+        sendBtn.disabled = true;
+        addTypingIndicator();
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'start', image_context: imageContext})
+            });
+            const data = await response.json();
+            removeTypingIndicator();
+            addBubble(data.bot_message, 'bot');
+        } catch (err) {
+            removeTypingIndicator();
+            addBubble("Something went wrong connecting to the assistant. Please refresh and try again.", 'bot');
+        }
+
+        chatInput.disabled = false;
+        sendBtn.disabled = false;
+        chatInput.focus();
+    }
+
+    async function sendMessage() {
+        const message = chatInput.value.trim();
+        if (!message) return;
+
+        addBubble(message, 'user');
+        chatInput.value = '';
+        chatInput.disabled = true;
+        sendBtn.disabled = true;
+        addTypingIndicator();
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: message})
+            });
+            const data = await response.json();
+            removeTypingIndicator();
+            addBubble(data.bot_message, 'bot');
+        } catch (err) {
+            removeTypingIndicator();
+            addBubble("Something went wrong. Please try again.", 'bot');
+        }
+
+        chatInput.disabled = false;
+        sendBtn.disabled = false;
+        chatInput.focus();
+    }
+
+    startChat();
+</script>
+
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}My History — SkinSense{% endblock %}
+{% block content %}
+
+<section class="page-header">
+    <h1>My Assessment History</h1>
+    <p class="page-subtitle">Your past image analyses and symptom conversations.</p>
+</section>
+
+<div class="history-wrap">
+
+    <h2 class="history-section-title">Image Analyses</h2>
+    {% if image_results %}
+        <div class="image-history-grid">
+            {% for result in image_results %}
+            <div class="history-card">
+                <img src="{{ url_for('static', filename='uploads/' + result.image_filename) }}" alt="Uploaded skin image" class="history-thumb">
+                <div class="history-card-body">
+                    <p class="history-condition">{{ result.predicted_class }}</p>
+                    <p class="history-meta">Confidence: {{ result.confidence }}%</p>
+                    <p class="history-meta">{{ result.timestamp.strftime('%d %b %Y, %I:%M %p') }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="history-empty">No image analyses yet. <a href="/image-predict">Analyze an image</a></p>
+    {% endif %}
+
+    <h2 class="history-section-title">Symptom Conversations</h2>
+    {% if chat_sessions %}
+        {% for chat in chat_sessions %}
+            {% if chat.messages %}
+            <details class="history-chat">
+                <summary>
+                    Conversation on {{ chat.created_at.strftime('%d %b %Y, %I:%M %p') }}
+                    <span class="history-meta">({{ chat.messages|length }} messages)</span>
+                </summary>
+                <div class="history-chat-body">
+                    {% for msg in chat.messages %}
+                    <div class="bubble {{ 'user-bubble' if msg.sender == 'user' else 'bot-bubble' }}">{{ msg.message }}</div>
+                    {% endfor %}
+                </div>
+            </details>
+            {% endif %}
+        {% endfor %}
+    {% else %}
+        <p class="history-empty">No conversations yet. <a href="/chatbot">Start an assessment</a></p>
+    {% endif %}
+
+</div>
+
+{% endblock %}

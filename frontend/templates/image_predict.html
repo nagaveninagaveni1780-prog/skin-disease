@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}Image Analysis — SkinSense{% endblock %}
+{% block content %}
+
+<section class="page-header">
+    <h1>Analyze Your Skin</h1>
+    <p class="page-subtitle">Upload a clear, well-lit image of the affected area for an AI-assisted assessment.</p>
+</section>
+
+<div class="analysis-card">
+
+    <div id="uploadArea" class="upload-area" onclick="document.getElementById('fileInput').click()">
+        <div class="upload-icon">📷</div>
+        <p class="upload-text">Drop your image here</p>
+        <p class="upload-subtext">or browse from your device</p>
+        <p class="upload-formats">Supported formats: JPG, PNG</p>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" style="display:none;">
+
+    <div id="previewArea" class="preview-area" style="display:none;">
+        <img id="previewImage" class="preview-image" src="" alt="Preview">
+        <p class="preview-success">✓ Image ready</p>
+        <div class="preview-actions">
+            <button class="btn" id="analyzeBtn" onclick="analyzeImage()">Analyze Image</button>
+            <button class="btn btn-outline" onclick="resetUpload()">Change Image</button>
+        </div>
+    </div>
+
+    <div id="loadingArea" class="loading-area" style="display:none;">
+        <div class="spinner"></div>
+        <p class="loading-title">Analyzing your image...</p>
+        <ul class="loading-steps">
+            <li id="step1">Processing image</li>
+            <li id="step2">Analyzing visual patterns</li>
+            <li id="step3">Preparing assessment</li>
+        </ul>
+    </div>
+
+    <div id="resultArea" class="result-area" style="display:none;">
+
+        <div id="urgentBanner" class="alert alert-urgent" style="display:none;">
+    <strong>Please get this checked soon.</strong> This result, or one of the close alternatives, falls in a category that can include skin cancer. Only a dermatologist can tell, so please see one promptly.
+        </div>
+
+        <div id="lowConfBanner" class="alert alert-warn" style="display:none;">
+            <strong>The model isn't very sure about this image.</strong> Treat this as a rough guess only.
+            Try a clearer, well-lit, close-up photo, and consult a dermatologist.
+        </div>
+
+        <p class="result-label" id="resultLabel">Possible Condition</p>
+        <h2 id="resultCondition" class="result-condition"></h2>
+        <p class="result-confidence" id="resultConfidence"></p>
+
+        <div id="top3Wrap" class="top3" style="display:none;">
+            <p class="top3-title">Other possibilities the model considered</p>
+            <ul id="top3List"></ul>
+        </div>
+
+        <div id="gradcamWrap" class="gradcam-wrap" style="display:none;">
+            <p class="top3-title">Why this result? Areas the model focused on</p>
+            <div class="gradcam-grid">
+                <figure>
+                    <img id="gcOriginal" alt="Your image">
+                    <figcaption>Your image</figcaption>
+                </figure>
+                <figure>
+                    <img id="gcHeatmap" alt="Model attention heatmap">
+                    <figcaption>Model attention (red = most influence)</figcaption>
+                </figure>
+            </div>
+        </div>
+
+        <p class="disclaimer">This result is AI-assisted and is not a medical diagnosis. This tool cannot rule out skin cancer. Any mole or spot that is changing, bleeding or growing should be seen by a doctor. Consult a qualified healthcare professional for confirmation.</p>
+
+        <div class="preview-actions" id="resultActions">
+            <button class="btn" id="discussBtn" onclick="discussWithAssistant()">💬 Discuss with assistant</button>
+            <button class="btn btn-outline" onclick="findDermatologists()">📍 Find dermatologists near me</button>
+            <button class="btn btn-outline" onclick="resetUpload()">Analyze Another Image</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const previewArea = document.getElementById('previewArea');
+    const previewImage = document.getElementById('previewImage');
+    const loadingArea = document.getElementById('loadingArea');
+    const resultArea = document.getElementById('resultArea');
+
+    let selectedFile = null;
+    let lastResult = null;
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length) handleFile(e.target.files[0]);
+    });
+
+    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+
+    function handleFile(file) {
+        selectedFile = file;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            previewImage.src = e.target.result;
+            uploadArea.style.display = 'none';
+            previewArea.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function resetUpload() {
+        selectedFile = null;
+        lastResult = null;
+        fileInput.value = '';
+        uploadArea.style.display = 'block';
+        previewArea.style.display = 'none';
+        loadingArea.style.display = 'none';
+        resultArea.style.display = 'none';
+        ['step1', 'step2', 'step3'].forEach(id => document.getElementById(id).classList.remove('step-done'));
+    }
+
+    function showError(message) {
+        loadingArea.style.display = 'none';
+        resultArea.style.display = 'block';
+        ['urgentBanner', 'lowConfBanner', 'top3Wrap', 'gradcamWrap'].forEach(id => document.getElementById(id).style.display = 'none');
+        document.getElementById('discussBtn').style.display = 'none';
+        document.getElementById('resultLabel').innerText = 'Something went wrong';
+        document.getElementById('resultCondition').innerText = 'Error';
+        document.getElementById('resultConfidence').innerText = message;
+    }
+
+    function showResult(data) {
+        lastResult = data;
+        loadingArea.style.display = 'none';
+        resultArea.style.display = 'block';
+        document.getElementById('discussBtn').style.display = 'inline-block';
+
+        document.getElementById('urgentBanner').style.display = data.urgent ? 'block' : 'none';
+        document.getElementById('lowConfBanner').style.display = data.low_confidence ? 'block' : 'none';
+
+        document.getElementById('resultLabel').innerText = data.low_confidence ? 'Closest Match (low confidence)' : 'Possible Condition';
+        document.getElementById('resultCondition').innerText = data.predicted_class;
+        document.getElementById('resultConfidence').innerText = `Model Confidence: ${data.confidence}%`;
+
+        const top3Wrap = document.getElementById('top3Wrap');
+        const list = document.getElementById('top3List');
+        list.innerHTML = '';
+        if (data.top3 && data.top3.length) {
+            data.top3.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = `${item.name} — ${item.confidence}%`;
+                list.appendChild(li);
+            });
+            top3Wrap.style.display = 'block';
+        } else {
+            top3Wrap.style.display = 'none';
+        }
+
+        const gcWrap = document.getElementById('gradcamWrap');
+        if (data.gradcam) {
+            document.getElementById('gcOriginal').src = previewImage.src;
+            document.getElementById('gcHeatmap').src = data.gradcam;
+            gcWrap.style.display = 'block';
+        } else {
+            gcWrap.style.display = 'none';
+        }
+    }
+
+    function discussWithAssistant() {
+        if (!lastResult) return;
+        try {
+            sessionStorage.setItem('imageContext', JSON.stringify({
+                condition: lastResult.predicted_class,
+                confidence: lastResult.confidence
+            }));
+        } catch (e) {}
+        window.location.href = '/chatbot';
+    }
+
+    async function analyzeImage() {
+        if (!selectedFile) return;
+
+        previewArea.style.display = 'none';
+        loadingArea.style.display = 'block';
+
+        setTimeout(() => document.getElementById('step1').classList.add('step-done'), 400);
+        setTimeout(() => document.getElementById('step2').classList.add('step-done'), 1000);
+
+        const formData = new FormData();
+        formData.append('image', selectedFile);
+
+        try {
+            const response = await fetch('/predict-image', { method: 'POST', body: formData });
+            const data = await response.json();
+            document.getElementById('step3').classList.add('step-done');
+
+            setTimeout(() => {
+                if (data.error) { showError(data.error); }
+                else { showResult(data); }
+            }, 500);
+        } catch (err) {
+            showError('Please try again.');
+        }
+    }
+</script>
+
+{% endblock %}

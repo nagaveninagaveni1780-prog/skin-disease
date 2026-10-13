@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}SkinSense — Home{% endblock %}
+{% block content %}
+
+<section class="hero">
+    <h1>Understand Your Skin Better</h1>
+    <p class="hero-subtitle">AI-assisted skin assessment through an image or a simple symptom conversation.</p>
+</section>
+
+<section class="option-grid">
+    <div class="option-card">
+        <div class="option-icon">📷</div>
+        <h3>Analyze an Image</h3>
+        <p>Upload a clear image of the affected skin area and get an AI-assisted analysis.</p>
+        <a href="/image-predict" class="btn">Get Started</a>
+    </div>
+
+    <div class="option-card">
+        <div class="option-icon">💬</div>
+        <h3>Describe Your Symptoms</h3>
+        <p>Answer a few simple questions with our interactive skin symptom assistant.</p>
+        <a href="/chatbot" class="btn">Get Started</a>
+    </div>
+</section>
+
+<section class="how-it-works">
+    <h2>How It Works</h2>
+    <div class="steps-grid">
+        <div class="step">
+            <div class="step-icon">1</div>
+            <p>Choose an assessment method</p>
+        </div>
+        <div class="step">
+            <div class="step-icon">2</div>
+            <p>Upload an image or answer questions</p>
+        </div>
+        <div class="step">
+            <div class="step-icon">3</div>
+            <p>AI analyzes the information</p>
+        </div>
+        <div class="step">
+            <div class="step-icon">4</div>
+            <p>Receive an assessment result</p>
+        </div>
+    </div>
+</section>
+
+<p class="disclaimer">This tool does not provide medical diagnosis. Always consult a certified dermatologist.</p>
+
+{% endblock %}

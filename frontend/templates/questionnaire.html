@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Symptom Questionnaire</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Symptom Questionnaire</h1>
+        <p class="subtitle">Answer the questions below based on your symptoms.</p>
+
+        <form id="questionnaireForm">
+            {% for q in questions %}
+            <div class="question-item">
+                <label>
+                    <input type="checkbox" name="{{ q.key }}">
+                    {{ q.text }}
+                </label>
+            </div>
+            {% endfor %}
+
+            <button type="button" class="btn" style="margin-top:20px;" onclick="submitQuestionnaire()">Get Assessment</button>
+        </form>
+
+        <div id="result"></div>
+
+        <p style="margin-top:20px;"><a href="/">← Back to Home</a></p>
+    </div>
+
+    <script>
+        async function submitQuestionnaire() {
+            const form = document.getElementById('questionnaireForm');
+            const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+            const answers = {};
+
+            checkboxes.forEach(cb => {
+                answers[cb.name] = cb.checked;
+            });
+
+            const resultDiv = document.getElementById('result');
+            resultDiv.classList.add('show');
+            resultDiv.innerHTML = 'Analyzing your answers...';
+
+            try {
+                const response = await fetch('/submit-questionnaire', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(answers)
+                });
+                const data = await response.json();
+
+                resultDiv.innerHTML = `
+                    <h3>Likely Condition: ${data.diagnosis}</h3>
+                    <p>Confidence: ${data.confidence}%</p>
+                    <p class="disclaimer">This is not a medical diagnosis. Please consult a dermatologist.</p>
+                `;
+            } catch (err) {
+                resultDiv.innerHTML = `<p style="color:red;">Something went wrong. Please try again.</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
